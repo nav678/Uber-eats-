@@ -3,49 +3,65 @@ import time
 
 st.set_page_config(page_title="Uber Eats Offer Checker", layout="centered")
 
+# Title
 st.markdown("<h1 style='text-align: center;'>Uber Eats Offer Checker</h1>", unsafe_allow_html=True)
+st.markdown("Enter the details of the offer below to see if you should accept it.")
 
-with st.form("offer_form", clear_on_submit=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        drive_time = st.number_input("Driving Time (minutes)", min_value=1, step=1, label_visibility="visible")
-    with col2:
-        miles = st.number_input("Miles", min_value=0.1, step=0.1, label_visibility="visible")
+# CSS for larger font inputs
+st.markdown("""
+    <style>
+        input[type=number] {
+            font-size: 24px !important;
+        }
+        label {
+            font-size: 20px !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
-    col3, col4 = st.columns(2)
-    with col3:
-        fuel_cost = st.number_input("Fuel Cost (£/mile)", min_value=0.0, step=0.01, label_visibility="visible")
-    with col4:
-        insurance_hourly = st.number_input("Insurance (£/hour)", min_value=0.0, step=0.01, label_visibility="visible")
+# Session state for countdown
+if 'start_time' not in st.session_state:
+    st.session_state.start_time = None
+if 'triggered' not in st.session_state:
+    st.session_state.triggered = False
 
-    offer_amount = st.number_input("Offer Amount (£)", min_value=0.01, step=0.01, label_visibility="visible")
+# Function to calculate and show result
+def evaluate_offer(miles, time_min, offer_amount):
+    drive_hours = time_min / 60
+    fuel_cost = miles * 0.09
+    insurance_cost = drive_hours * 1.75
+    total_cost = fuel_cost + insurance_cost
+    target_profit = drive_hours * 15
+    min_price = total_cost + target_profit
 
-    submitted = st.form_submit_button("Submit")
+    st.markdown(f"### Minimum Acceptable Price: £{min_price:.2f}")
 
-if submitted:
-    st.markdown("### ⏳ Evaluating...")
-    time.sleep(0.5)
-
-    # Convert driving time to hours
-    drive_hours = drive_time / 60
-
-    # Calculate cost
-    fuel_total = miles * fuel_cost
-    insurance_total = insurance_hourly * drive_hours
-    total_cost = fuel_total + insurance_total
-
-    # Net profit and rate
-    net_profit = offer_amount - total_cost
-    net_per_hour = net_profit / drive_hours if drive_hours > 0 else 0
-
-    # Result
-    st.markdown("### ✅ Result:")
-    st.write(f"**Net Profit:** £{net_profit:.2f}")
-    st.write(f"**Net per Hour:** £{net_per_hour:.2f}")
-
-    if net_per_hour >= 15:
-        st.success("Great offer! Accept it.")
+    if offer_amount >= min_price:
+        st.success("ACCEPT – This offer meets your minimum requirements.")
     else:
-        st.error("Not worth it. Better to skip.")
+        st.error("REJECT – This offer does not meet your minimum requirements.")
 
-    st.caption("Minimum target: £15/hour net profit")
+# Inputs
+miles = st.number_input("Miles", min_value=0.1, step=0.1, key="miles")
+time_min = st.number_input("Estimated Time (minutes)", min_value=1, step=1, key="time")
+offer_amount = st.number_input("Offer Amount (£)", min_value=0.1, step=0.1, key="offer")
+
+# Detect start of typing
+if not st.session_state.start_time and (miles or time_min or offer_amount):
+    st.session_state.start_time = time.time()
+
+# Countdown logic
+if st.session_state.start_time and not st.session_state.triggered:
+    seconds_passed = time.time() - st.session_state.start_time
+    remaining = 11 - int(seconds_passed)
+    if remaining > 0:
+        st.warning(f"⏳ Auto-checking in {remaining} seconds...")
+        time.sleep(1)
+        st.experimental_rerun()
+    else:
+        st.session_state.triggered = True
+        st.experimental_rerun()
+
+# After countdown & inputs filled
+if st.session_state.triggered and all([miles, time_min, offer_amount]):
+    evaluate_offer(miles, time_min, offer_amount)
